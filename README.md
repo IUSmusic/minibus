@@ -1,16 +1,9 @@
+![](./MINIBUS.png)
+
+
 # MINIBUS Lite
 
 MINIBUS Lite is a compact desktop-corner audio patch panel. It is designed for quick lane-based routing while staying small enough to live in the corner of a desktop.
-
-```text
-input/source → app → app → app → output/destination
-input/source → app → app → app → output/destination
-input/source → app → app → app → output/destination
-input/source → app → app → app → output/destination
-input/source → app → app → app → output/destination
-MIC ON/OFF
-MONITOR ON/OFF
-```
 
 MINIBUS is a **control plane**, not an audio engine. It does not process audio in Python. On Linux it asks PipeWire to create and remove audio links. On Windows and macOS it currently provides initial backend discovery, diagnostics, app launching, and a stable UI foundation for future native routing.
 
