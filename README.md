@@ -1,23 +1,32 @@
-![](./MINIBUS.png)
-
-
 # MINIBUS Lite
 
 MINIBUS Lite is a compact desktop-corner audio patch panel. It is designed for quick lane-based routing while staying small enough to live in the corner of a desktop.
 
-MINIBUS is a **control plane**, not an audio engine. It does not process audio in Python. On Linux it asks PipeWire to create and remove audio links. On Windows and macOS it currently provides initial backend discovery, diagnostics, app launching, and a stable UI foundation for future native routing.
+```text
+input/source → app → app → app → output/destination
+input/source → app → app → app → output/destination
+input/source → app → app → app → output/destination
+input/source → app → app → app → output/destination
+input/source → app → app → app → output/destination
+MIC ON/OFF
+MONITOR ON/OFF
+```
 
-Current release: **v0.4.0 cross-platform backend foundation**  
+MINIBUS is a **control plane**, not an audio engine. It does not process audio in Python. On Linux it asks PipeWire to create and remove audio links. On Windows and macOS it provides backend discovery, diagnostics, app launching, virtual-device-assisted route tracking, and a stable UI foundation for future native routing.
+
+Current release: **v0.4.1 virtual-device route tracking update**  
 Runtime: **Python 3 + Tkinter**  
 Primary backend: **Linux PipeWire**  
-Preview backends: **Windows WASAPI discovery**, **macOS CoreAudio discovery**  
+Preview backends: **Windows WASAPI discovery + virtual route tracking**, **macOS CoreAudio discovery + virtual route tracking**  
 License: **MIT**, see `LICENSE`.
 
 ## Important platform note
 
-Linux/PipeWire is the only backend that currently performs real patching.
+Linux/PipeWire is the only backend that currently performs native patching.
 
-Windows and macOS do not expose a PipeWire-style graph that a small Python app can link with one command. Full Windows/macOS routing will need a deeper native backend and usually a virtual audio driver/device such as VB-CABLE, Voicemeeter, BlackHole, Loopback, or similar. MINIBUS v0.4.0 adds the backend structure and device discovery so the project is ready for that work, but it does **not** claim full WASAPI/CoreAudio routing parity yet.
+Windows and macOS do not expose a PipeWire-style graph that a small Python app can link with one command. MINIBUS can now track routes that use external virtual audio devices such as VB-CABLE, Voicemeeter, BlackHole, Loopback, or similar. In that mode, the virtual audio driver does the actual audio forwarding and MINIBUS stores the route state.
+
+This is useful for real Windows/macOS workflows, but it is still not full native WASAPI/CoreAudio routing parity. Full native routing will require deeper platform backend code.
 
 ## Platform support
 
@@ -30,8 +39,8 @@ Windows and macOS do not expose a PipeWire-style graph that a small Python app c
 | Other PipeWire Linux | Likely | Run diagnostics first. |
 | Linux PulseAudio only | Not supported | Use PipeWire/Pulse compatibility. |
 | Linux JACK only | Not supported | Use PipeWire/JACK compatibility. |
-| Windows | Preview | UI, tests, app launching, WASAPI endpoint discovery. No real patching yet. |
-| macOS | Preview | UI, tests, app launching, CoreAudio device discovery. No real patching yet. |
+| Windows | Preview | UI, tests, app launching, WASAPI endpoint discovery, virtual-device route tracking for VB-CABLE/Voicemeeter-style setups. No native WASAPI patching yet. |
+| macOS | Preview | UI, tests, app launching, CoreAudio device discovery, virtual-device route tracking for BlackHole/Loopback-style setups. No native CoreAudio patching yet. |
 
 ## Repository layout
 
@@ -58,6 +67,7 @@ tests/test_minibus_core.py        unit tests
 - Wine `.exe` discovery on Linux.
 - Windows Start Menu / Program Files launcher discovery.
 - macOS `.app` launcher discovery.
+- Windows/macOS virtual-device route tracking for VB-CABLE, Voicemeeter, BlackHole, Loopback, and similar devices.
 - Manual file picker for custom binaries, AppImages, EXEs, and app launchers.
 - Learn mode for binding the next new audio port to a lane.
 - Real MIC switch for MINIBUS-created mic/capture links on PipeWire.
@@ -96,25 +106,29 @@ This is the production backend. It can list ports, create links, remove links, c
 
 ### Windows: WASAPI preview backend
 
-The Windows backend currently discovers audio endpoints through PowerShell and labels them as `WASAPI::Device Name`. It can also discover and launch Start Menu shortcuts and EXE files.
+The Windows backend discovers audio endpoints through PowerShell and labels them as `WASAPI::Device Name`. It can also discover and launch Start Menu shortcuts and EXE files.
+
+If a selected route uses a virtual audio endpoint such as VB-CABLE, Voicemeeter, or another virtual cable, MINIBUS can track the route as a virtual-device route. The external virtual driver performs the actual audio forwarding.
 
 Current limitations:
 
-- No arbitrary app-to-app patching yet.
-- No virtual bus creation yet.
-- MIC/MONITOR controls cannot alter Windows routing yet.
-- A future backend should integrate Windows audio session APIs and/or virtual audio devices.
+- No native arbitrary app-to-app WASAPI patching yet.
+- No native virtual bus creation yet.
+- MIC/MONITOR controls can only manage MINIBUS-tracked routes.
+- A future backend should integrate Windows audio session APIs and/or tighter virtual-device control.
 
 ### macOS: CoreAudio preview backend
 
-The macOS backend currently discovers CoreAudio devices using `system_profiler`. If `SwitchAudioSource` is installed, MINIBUS can use it for cleaner device enumeration. It can also discover and launch `.app` bundles.
+The macOS backend discovers CoreAudio devices using `system_profiler`. If `SwitchAudioSource` is installed, MINIBUS can use it for cleaner device enumeration. It can also discover and launch `.app` bundles.
+
+If a selected route uses a virtual audio endpoint such as BlackHole, Loopback, VB-CABLE, or another virtual cable, MINIBUS can track the route as a virtual-device route. The external virtual driver performs the actual audio forwarding.
 
 Current limitations:
 
-- No arbitrary app-to-app patching yet.
-- No virtual bus creation yet.
-- MIC/MONITOR controls cannot alter CoreAudio routing yet.
-- A future backend should integrate CoreAudio APIs and/or virtual audio devices such as BlackHole.
+- No native arbitrary app-to-app CoreAudio patching yet.
+- No native virtual bus creation yet.
+- MIC/MONITOR controls can only manage MINIBUS-tracked routes.
+- A future backend should integrate CoreAudio APIs and/or tighter virtual-device control.
 
 ## Install on Linux Mint, Ubuntu, Debian
 
@@ -122,8 +136,8 @@ Extract the release zip, then run:
 
 ```bash
 cd ~/Desktop
-unzip minibus-lite-v0.4.0.zip
-cd minibus-lite-v0.4.0
+unzip minibus-lite-v0.4.1.zip
+cd minibus-lite-v0.4.1
 ./install.sh
 ./run.sh
 ```
@@ -182,13 +196,15 @@ py diagnose_minibus.py
 py minibus.py
 ```
 
-Expected result on Windows v0.4.0:
+Expected result on Windows v0.4.1:
 
 - The UI should open if Tkinter is available.
 - Tests should run.
 - Diagnostics should report the WASAPI backend.
 - Audio endpoints may appear as `WASAPI::...`.
-- Patch/off/bus routing will report that full WASAPI patching is not implemented yet.
+- If VB-CABLE, Voicemeeter, or a similar virtual driver is installed, diagnostics should identify virtual-looking endpoints.
+- Patch/off can track routes that include a virtual audio endpoint.
+- Non-virtual app-to-app patching will report that native WASAPI patching is not implemented yet.
 
 ## Run on macOS
 
@@ -208,13 +224,40 @@ Optional helper for better CoreAudio device listing:
 brew install switchaudio-osx
 ```
 
-Expected result on macOS v0.4.0:
+Expected result on macOS v0.4.1:
 
 - The UI should open if Tkinter is available.
 - Tests should run.
 - Diagnostics should report the CoreAudio backend.
 - Audio devices may appear as `CoreAudio::...`.
-- Patch/off/bus routing will report that full CoreAudio patching is not implemented yet.
+- If BlackHole, Loopback, VB-CABLE, or a similar virtual driver is installed, diagnostics should identify virtual-looking endpoints.
+- Patch/off can track routes that include a virtual audio endpoint.
+- Non-virtual app-to-app patching will report that native CoreAudio patching is not implemented yet.
+
+## Virtual-device routing on Windows/macOS
+
+MINIBUS can now track routes that include common virtual audio endpoints. This is the practical Windows/macOS path until native WASAPI/CoreAudio patching is implemented.
+
+Typical Windows setup:
+
+```text
+App output → VB-CABLE / Voicemeeter virtual input → recorder / processor input
+```
+
+Typical macOS setup:
+
+```text
+App output → BlackHole / Loopback virtual device → recorder / processor input
+```
+
+Important distinction:
+
+```text
+MINIBUS tracks the route.
+The virtual audio driver forwards the audio.
+```
+
+Use `audio` to refresh endpoints after installing a virtual device. Then select the virtual endpoint in a lane and press `patch`. If neither endpoint looks like a virtual device, MINIBUS will still report that native Windows/macOS patching is not implemented.
 
 ## Basic use on Linux/PipeWire
 
@@ -348,6 +391,7 @@ The normal diagnostic checks:
 - PowerShell endpoint discovery on Windows
 - CoreAudio device discovery on macOS
 - visible audio ports/devices
+- virtual audio endpoint detection on Windows/macOS
 - app launcher discovery
 - core unit tests
 
@@ -406,14 +450,17 @@ For Windows/macOS preview testing:
 3. Start the UI.
 4. Confirm launcher discovery works.
 5. Confirm endpoints/devices are visible where possible.
-6. Confirm unsupported patching returns a clear message rather than crashing.
+6. If a virtual audio driver is installed, confirm a route using that endpoint can be patched and shown in the link inspector.
+7. Confirm non-virtual native patching returns a clear message rather than crashing.
 
 ## Configuration
 
-MINIBUS saves UI state here:
+MINIBUS saves UI state in the platform user config directory:
 
 ```text
-~/.config/minibus/config.json
+Linux:   ~/.config/minibus/config.json
+macOS:   ~/Library/Application Support/MINIBUS/config.json
+Windows: %APPDATA%\MINIBUS\config.json
 ```
 
 This stores:
@@ -426,13 +473,25 @@ This stores:
 - topmost setting
 - auto-refresh setting
 
-To reset MINIBUS state on Linux/macOS:
+To reset MINIBUS state:
+
+Linux:
 
 ```bash
 rm -f ~/.config/minibus/config.json
 ```
 
-On Windows, Python may still resolve this path under the user profile if `XDG_CONFIG_HOME` is not set. Future Windows releases should move config to `%APPDATA%`.
+macOS:
+
+```bash
+rm -f "$HOME/Library/Application Support/MINIBUS/config.json"
+```
+
+Windows PowerShell:
+
+```powershell
+Remove-Item "$env:APPDATA\MINIBUS\config.json" -ErrorAction SilentlyContinue
+```
 
 ## Troubleshooting
 
@@ -484,6 +543,12 @@ wine /path/to/app.exe
 
 If Wine cannot launch the app outside MINIBUS, MINIBUS cannot launch it either.
 
+### Windows/macOS route does not produce audio
+
+Check that the route includes a real virtual audio device such as VB-CABLE, Voicemeeter, BlackHole, or Loopback. MINIBUS only tracks the route; the external virtual driver must be installed and selected in the source/target applications.
+
+If the app itself has an audio device selector, choose the virtual input/output there as well. Then press `audio` in MINIBUS to refresh device discovery.
+
 ### MIC or MONITOR did not disconnect something
 
 MINIBUS intentionally avoids disconnecting arbitrary system links. It only manages links it created or saved in its lanes. This protects unrelated desktop audio.
@@ -532,7 +597,7 @@ Build a clean zip from the parent folder:
 
 ```bash
 cd ..
-zip -r minibus-lite-v0.4.0.zip minibus-lite-v0.4.0 \
+zip -r minibus-lite-v0.4.1.zip minibus-lite-v0.4.1 \
   -x '*/__pycache__/*' '*/.git/*' '*.pyc' '*/.pytest_cache/*'
 ```
 
@@ -565,6 +630,15 @@ For pull requests, include:
 - Output from `diagnose_minibus.py` when the change affects routing or discovery.
 
 ## Changelog
+
+### v0.4.1
+
+- Added virtual-device route tracking for Windows/macOS preview backends.
+- Added virtual audio endpoint detection in diagnostics.
+- Improved unsupported-route messages for native WASAPI/CoreAudio routes.
+- Updated Windows config storage to use `%APPDATA%\MINIBUS`.
+- Updated macOS config storage to use `~/Library/Application Support/MINIBUS`.
+- Added unit tests for virtual-device route tracking.
 
 ### v0.4.0
 
@@ -621,5 +695,5 @@ Cross-platform roadmap:
 - Add a proper `backend-linux-pipewire` module.
 - Expand `backend-windows-wasapi` beyond discovery.
 - Expand `backend-macos-coreaudio` beyond discovery.
-- Document recommended virtual audio drivers for Windows and macOS.
+- Expand virtual-driver integration beyond route tracking.
 - Keep the same lane UI and config format across all platforms.

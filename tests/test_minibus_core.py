@@ -231,3 +231,44 @@ Audio:
             ok, msg = minibus.connect_audio_ports('WASAPI::A', 'WASAPI::B')
             self.assertFalse(ok)
             self.assertIn('not implemented', msg)
+
+    def test_windows_virtual_device_route_is_tracked(self):
+        with patch.object(minibus.platform, 'system', return_value='Windows'):
+            minibus._virtual_connections.clear()
+            ok, msg = minibus.connect_audio_ports('WASAPI::Firefox', 'WASAPI::CABLE Input')
+            self.assertTrue(ok)
+            self.assertIn('virtual-device route', msg)
+            self.assertTrue(any('CABLE Input' in link for link in minibus.current_links()))
+            ok, msg = minibus.disconnect_audio_ports('WASAPI::Firefox', 'WASAPI::CABLE Input')
+            self.assertTrue(ok)
+            self.assertIn('virtual-device route', msg)
+            minibus._virtual_connections.clear()
+
+    def test_macos_virtual_device_route_is_tracked(self):
+        with patch.object(minibus.platform, 'system', return_value='Darwin'):
+            minibus._virtual_connections.clear()
+            ok, msg = minibus.connect_audio_ports('CoreAudio::BlackHole 2ch', 'CoreAudio::Recorder')
+            self.assertTrue(ok)
+            self.assertIn('virtual-device route', msg)
+            self.assertTrue(any('BlackHole 2ch' in link for link in minibus.current_links()))
+            minibus._virtual_connections.clear()
+
+    def test_non_pipewire_non_virtual_connect_still_reports_unsupported(self):
+        with patch.object(minibus.platform, 'system', return_value='Windows'):
+            minibus._virtual_connections.clear()
+            ok, msg = minibus.connect_audio_ports('WASAPI::Speakers', 'WASAPI::Headphones')
+            self.assertFalse(ok)
+            self.assertIn('native app-to-app patching is not implemented', msg)
+
+    def test_detected_virtual_devices(self):
+        ports = ['WASAPI::Speakers', 'WASAPI::CABLE Input', 'WASAPI::Voicemeeter Output']
+        self.assertEqual(
+            minibus.detected_virtual_devices(ports),
+            ['WASAPI::CABLE Input', 'WASAPI::Voicemeeter Output'],
+        )
+
+    def test_default_config_dir_uses_appdata_on_windows(self):
+        with patch.object(minibus.platform, 'system', return_value='Windows'), \
+             patch.dict(minibus.os.environ, {'APPDATA': r'C:\Users\Peter\AppData\Roaming'}, clear=False):
+            self.assertIn('MINIBUS', str(minibus.default_config_dir()))
+            self.assertIn('AppData', str(minibus.default_config_dir()))
